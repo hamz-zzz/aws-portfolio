@@ -27,7 +27,7 @@ This repository contains a structured collection of AWS hands-on architecture pr
 ![HA Web App Architecture](architecture/aws-webapp-ha-architecture.svg)
 
 - **Repository:** https://github.com/hamz-zzz/aws_webapp_ha  
-- Scalable, fault-tolerant application architecture using load balancing and auto scaling
+- Scalable and fault-tolerant application architecture using load balancing and auto scaling
 
 ---
 
