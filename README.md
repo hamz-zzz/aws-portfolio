@@ -1,6 +1,6 @@
 # AWS Cloud Architecture Portfolio
 
-This repository contains a structured collection of AWS hands-on architecture projects focused on networking, high availability, and cloud infrastructure design.
+This portfolio contains a structured collection of AWS hands-on architecture projects focused on networking, high availability, and cloud infrastructure design.
 
 ---
 
