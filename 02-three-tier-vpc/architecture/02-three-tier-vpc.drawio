@@ -1,0 +1,100 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="page-1">
+    <mxGraphModel dx="410" dy="221" grid="1" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="vpc" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F2F7FC;strokeColor=#5B9BD5;strokeWidth=2;dashed=1;verticalAlign=top;align=left;spacingLeft=12;fontStyle=1;fontColor=#174A75;" value="VPC: 3-Tier (10.0.0.0/16)" vertex="1">
+          <mxGeometry height="1020" width="920" x="20" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="az1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7FAFE;strokeColor=#91B7D9;strokeWidth=1;dashed=1;verticalAlign=top;align=center;fontStyle=2;fontColor=#315B80;" value="Availability Zone: us-east-1a" vertex="1">
+          <mxGeometry height="940" width="400" x="40" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="az2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F7FAFE;strokeColor=#91B7D9;strokeWidth=1;dashed=1;verticalAlign=top;align=center;fontStyle=2;fontColor=#315B80;" value="Availability Zone: us-east-1b" vertex="1">
+          <mxGeometry height="940" width="400" x="520" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="internet" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#12304A;fontSize=14;" value="Internet" vertex="1">
+          <mxGeometry height="30" width="55" x="210" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="igw" parent="1" style="shape=mxgraph.aws4.internet_gateway;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=14;labelPerimeter=1;" value="Internet Gateway (IGW)" vertex="1">
+          <mxGeometry height="50" width="50" x="455" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="pubA" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7F1FB;strokeColor=#2F75B5;strokeWidth=1.4;fontColor=#174A75;verticalAlign=top;align=left;spacingLeft=10;" value="Public Subnet A&#xa;(10.0.1.0/24)" vertex="1">
+          <mxGeometry height="180" width="360" x="60" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="pubB" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7F1FB;strokeColor=#2F75B5;strokeWidth=1.4;fontColor=#174A75;verticalAlign=top;align=right;spacingRight=10;" value="Public Subnet B&#xa;(10.0.2.0/24)" vertex="1">
+          <mxGeometry height="180" width="360" x="540" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="appA" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7F5EC;strokeColor=#3C9B70;strokeWidth=1.4;fontColor=#205B43;verticalAlign=top;align=left;spacingLeft=10;" value="App Subnet A (Private)&#xa;(10.0.11.0/24)" vertex="1">
+          <mxGeometry height="180" width="360" x="60" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="appB" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E7F5EC;strokeColor=#3C9B70;strokeWidth=1.4;fontColor=#205B43;verticalAlign=top;align=right;spacingRight=10;" value="App Subnet B (Private)&#xa;(10.0.12.0/24)" vertex="1">
+          <mxGeometry height="180" width="360" x="540" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="dbA" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4EFF8;strokeColor=#9673A6;strokeWidth=1.4;fontColor=#513B67;verticalAlign=top;align=left;spacingLeft=10;" value="DB Subnet A (Private)&#xa;(10.0.21.0/24)&#xa;&#xa;No Internet Route (Isolated)" vertex="1">
+          <mxGeometry height="180" width="360" x="60" y="970" as="geometry" />
+        </mxCell>
+        <mxCell id="dbB" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#F4EFF8;strokeColor=#9673A6;strokeWidth=1.4;fontColor=#513B67;verticalAlign=top;align=right;spacingRight=10;" value="DB Subnet B (Private)&#xa;(10.0.22.0/24)&#xa;&#xa;No Internet Route (Isolated)" vertex="1">
+          <mxGeometry height="180" width="360" x="540" y="970" as="geometry" />
+        </mxCell>
+        <mxCell id="bastion" parent="1" style="shape=mxgraph.aws4.ec2;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=14;labelPerimeter=1;" value="Bastion Host&#xa;(bastion-sg)" vertex="1">
+          <mxGeometry height="50" width="50" x="220" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="alb" parent="1" style="shape=mxgraph.aws4.application_load_balancer;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=14;labelPerimeter=1;" value="ALB (alb-sg)" vertex="1">
+          <mxGeometry height="50" width="50" x="455" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="nat" parent="1" style="shape=mxgraph.aws4.nat_gateway;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=13;labelPerimeter=1;" value="Regional NAT Gateway&#xa;(HA, Multi-AZ, Auto-expanding)" vertex="1">
+          <mxGeometry height="50" width="50" x="455" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="appServerA" parent="1" style="shape=mxgraph.aws4.ec2;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=14;labelPerimeter=1;" value="App Server A&#xa;(app-sg)" vertex="1">
+          <mxGeometry height="50" width="50" x="220" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="appServerB" parent="1" style="shape=mxgraph.aws4.ec2;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#D79B00;strokeColor=none;fontColor=#704A00;fontSize=14;labelPerimeter=1;" value="App Server B&#xa;(app-sg)" vertex="1">
+          <mxGeometry height="50" width="50" x="700" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="rdsPrimary" parent="1" style="shape=mxgraph.aws4.rds;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#9673A6;strokeColor=none;fontColor=#513B67;fontSize=14;labelPerimeter=1;" value="RDS Primary&#xa;(MySQL, db-sg)" vertex="1">
+          <mxGeometry height="50" width="60" x="215" y="1040" as="geometry" />
+        </mxCell>
+        <mxCell id="rdsStandby" parent="1" style="shape=mxgraph.aws4.rds;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#9673A6;strokeColor=none;fontColor=#513B67;fontSize=14;labelPerimeter=1;" value="RDS Standby&#xa;(Passive, db-sg)" vertex="1">
+          <mxGeometry height="50" width="60" x="695" y="1040" as="geometry" />
+        </mxCell>
+        <mxCell id="internetIGW" edge="1" parent="1" source="internet" style="endArrow=classic;html=1;strokeColor=#526579;strokeWidth=1.5;fontColor=#12304A;labelBackgroundColor=#FFFFFF;defaultLabelBackgroundColor=page;" target="igw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="igwAlb" edge="1" parent="1" source="igw" style="endArrow=classic;html=1;strokeColor=#526579;strokeWidth=1.5;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="alb" value="HTTP/HTTPS (80/443)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="igwBastion" edge="1" parent="1" source="igw" style="dashed=1;endArrow=classic;html=1;strokeColor=#526579;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="bastion" value="0.0.0.0/0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="internetBastion" edge="1" parent="1" source="internet" style="endArrow=classic;html=1;strokeColor=#526579;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;exitX=0.703;exitY=1.047;exitDx=0;exitDy=0;exitPerimeter=0;" target="bastion" value="SSH (22)">
+          <mxGeometry relative="1" x="-0.0091" as="geometry" />
+        </mxCell>
+        <mxCell id="bastionAppA" edge="1" parent="1" source="bastion" style="dashed=1;endArrow=classic;html=1;strokeColor=#526579;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="appServerA" value="SSH (22)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="albAppA" edge="1" parent="1" source="alb" style="endArrow=classic;html=1;strokeColor=#526579;strokeWidth=2;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="appServerA" value="HTTP (80)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="albAppB" edge="1" parent="1" source="alb" style="endArrow=classic;html=1;strokeColor=#526579;strokeWidth=2;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="appServerB" value="HTTP (80)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="appANat" edge="1" parent="1" source="appServerA" style="dashed=1;endArrow=classic;html=1;strokeColor=#526579;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="nat" value="0.0.0.0/0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="appBNat" edge="1" parent="1" source="appServerB" style="dashed=1;endArrow=classic;html=1;strokeColor=#526579;fontColor=#12304A;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="nat" value="0.0.0.0/0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="appARds" edge="1" parent="1" source="appServerA" style="endArrow=classic;html=1;strokeColor=#9673A6;strokeWidth=2;fontColor=#513B67;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="rdsPrimary" value="MySQL (3306)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="appBRds" edge="1" parent="1" source="appServerB" style="endArrow=classic;html=1;strokeColor=#9673A6;strokeWidth=2;fontColor=#513B67;labelBackgroundColor=#FFFFFF;labelPlacement=auto;" target="rdsPrimary" value="MySQL (3306)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rdsReplication" edge="1" parent="1" source="rdsPrimary" style="endArrow=classic;html=1;strokeColor=#9673A6;strokeWidth=2;fontColor=#513B67;labelBackgroundColor=#FFFFFF;verticalAlign=bottom;labelPlacement=auto;" target="rdsStandby" value="Synchronous Replication">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

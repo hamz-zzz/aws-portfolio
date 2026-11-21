@@ -1,0 +1,1 @@
+stress-ng --cpu 4 --cpu-load 90 --timeout 300s
