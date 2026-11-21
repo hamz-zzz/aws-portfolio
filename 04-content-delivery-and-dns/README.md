@@ -4,23 +4,25 @@
 
 ## Overview
 
-A static website is hosted in a private S3 bucket and delivered through CloudFront. Route 53 directs `systemsbyhamza.com` to the CloudFront distribution.
+I built this project to host a static website in a private Amazon S3 bucket and deliver it through CloudFront. Route 53 directs `systemsbyhamza.com` to the CloudFront distribution.
 
-The S3 bucket blocks public access. CloudFront uses Origin Access Control (OAC) to sign requests to the S3 origin, and the bucket policy allows requests from the distribution only. An ACM certificate provides HTTPS, and CloudFront caching is enabled.
+The S3 bucket stays private. CloudFront uses Origin Access Control (OAC) to sign requests to the S3 origin, and the bucket policy allows access only from the distribution. An ACM certificate provides HTTPS. CloudFront also uses caching.
 
-Validation covered DNS resolution over IPv4 and IPv6, direct access to the S3 bucket, CloudFront cache hits and misses, and cache invalidation.
+I tested the custom domains, direct S3 access, CloudFront cache hits and misses, cache invalidation, and DNS resolution over IPv4 and IPv6.
 
 ## Architecture
+
+The request path has three parts:
 
 1. Route 53 directs requests for the custom domain to CloudFront.
 2. CloudFront serves cached objects or requests content from S3 through OAC.
 3. S3 stores the website files. The bucket policy restricts access to the CloudFront distribution.
 
-CloudFront uses the S3 bucket's regional REST endpoint rather than the S3 static website endpoint. The distribution uses `index.html` as its default root object.
+CloudFront uses the S3 bucket's regional REST endpoint instead of the S3 static website endpoint. The distribution uses `index.html` as its default root object.
 
 ## Route 53 and custom domain
 
-`systemsbyhamza.com` was registered through Route 53, and a public hosted zone was created for the domain.
+I registered `systemsbyhamza.com` through Route 53 and created a public hosted zone for the domain.
 
 | Record | Name | Target |
 |---|---|---|
@@ -28,7 +30,7 @@ CloudFront uses the S3 bucket's regional REST endpoint rather than the S3 static
 | AAAA (Alias) | `systemsbyhamza.com` | CloudFront distribution |
 | CNAME | `www.systemsbyhamza.com` | `systemsbyhamza.com` |
 
-The root domain has A and AAAA alias records for IPv4 and IPv6. The `www` CNAME points to `systemsbyhamza.com`.
+The root domain uses A and AAAA alias records for IPv4 and IPv6. The `www` CNAME points to `systemsbyhamza.com`.
 
 **Domain registration**
 
@@ -52,7 +54,7 @@ The root domain has A and AAAA alias records for IPv4 and IPv6. The `www` CNAME 
 
 ## Private S3 origin
 
-The S3 bucket contains `index.html` and the page's image assets. Block Public Access and default encryption are enabled.
+The S3 bucket stores `index.html` and the page's image assets. Block Public Access and default encryption are enabled.
 
 **S3 bucket**
 
@@ -72,11 +74,11 @@ The S3 bucket contains `index.html` and the page's image assets. Block Public Ac
 
 ### Origin Access Control
 
-CloudFront uses the S3 REST endpoint as its origin instead of the S3 website endpoint. OAC signs requests from CloudFront, and the bucket policy allows access from the distribution.
+CloudFront uses the S3 REST endpoint as its origin. OAC signs requests from CloudFront, and the bucket policy allows access from the distribution only.
 
 ![S3 bucket policy for CloudFront OAC](screenshots/2-5-s3-bucket-policy.png)
 
-A direct request to the S3 object URL returned `AccessDenied`, as expected.
+I opened the S3 object URL directly to check the bucket's access restriction. The request returned `AccessDenied`, as expected.
 
 ![Direct S3 object access denied](screenshots/2-6-s3-access-denied-test.png)
 
@@ -105,19 +107,17 @@ The distribution uses `systemsbyhamza.com` and `www.systemsbyhamza.com` as alter
 
 ![CloudFront behavior settings](screenshots/3-3-cloudfront-behavior-settings.png)
 
-The first request fetched the object from S3. A repeated request returned a cache hit. An invalidation was also tested to remove the cached object.
+I checked the cache behavior with repeated requests. The first request fetched the object from S3, and the next request returned a cache hit. An invalidation removed the cached object.
 
 ## HTTPS with ACM
 
-An ACM certificate was requested in `us-east-1` for `systemsbyhamza.com` and `www.systemsbyhamza.com`.
-
-The certificate was validated through Route 53 DNS records and attached to the CloudFront distribution. Both custom domains use HTTPS.
+The ACM certificate covers `systemsbyhamza.com` and `www.systemsbyhamza.com`. I requested it in `us-east-1`, validated it through Route 53 DNS records, and attached it to the CloudFront distribution. Both custom domains use HTTPS.
 
 ![Issued ACM certificate](screenshots/3-4-acm-certificate-issued.png)
 
 ## Validation
 
-The website was tested through the custom domain, the CloudFront distribution domain, and the S3 object URL.
+I checked the website through the custom domain, the CloudFront distribution domain, and the S3 object URL.
 
 ### Website access
 
@@ -131,7 +131,7 @@ The homepage loaded through `systemsbyhamza.com`, and the browser showed a valid
 
 ![HTTPS certificate in the browser](screenshots/4-2-site-https-cert.png)
 
-The page's image also loads through CloudFront.
+The page's image also loaded through CloudFront.
 
 ![Static image loaded through CloudFront](screenshots/4-3-image-direct-load.png)
 
@@ -143,9 +143,9 @@ The website also loaded through the CloudFront distribution domain and `www.syst
 
 ### Cache behavior
 
-Testing covered a cache miss, a cache hit, and a request after invalidation.
+I tested a cache miss, a cache hit, and a request after invalidation.
 
-| Test | Expected behavior |
+| Test | Result |
 | --- | --- |
 | Cache miss | CloudFront fetches the object from S3. |
 | Cache hit | CloudFront serves the cached object. |
@@ -170,7 +170,7 @@ Testing covered a cache miss, a cache hit, and a request after invalidation.
 
 ### DNS resolution
 
-`nslookup` and `dig` were used to check DNS resolution. Both commands returned CloudFront IPv4 and IPv6 addresses for the root domain.
+I used `nslookup` and `dig` to check DNS resolution. Both commands returned CloudFront IPv4 and IPv6 addresses for the root domain.
 
 | `nslookup` | `dig` |
 | --- | --- |
@@ -180,6 +180,8 @@ The results matched the A and AAAA alias records in Route 53.
 
 ## Project files
 
-- **[architecture/](./architecture/)** — PNG architecture diagram and editable draw.io source.
-- **[configs/](./configs/)** — `index.html` and the static image assets.
-- **[screenshots/](./screenshots/)** — Route 53, S3, CloudFront, ACM, DNS resolution, and validation evidence.
+The repository contains the architecture diagram, website files, and screenshots from the AWS configuration and validation.
+
+- **[architecture/](./architecture/)**: PNG architecture diagram and editable draw.io source.
+- **[configs/](./configs/)**: `index.html` and the static image assets.
+- **[screenshots/](./screenshots/)**: Route 53, S3, CloudFront, ACM, DNS resolution, and validation evidence.

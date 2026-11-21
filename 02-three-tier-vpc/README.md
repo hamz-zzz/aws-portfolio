@@ -4,15 +4,15 @@
 
 ## Overview
 
-This project covers a three-tier application environment in AWS across two Availability Zones. An internet-facing Application Load Balancer (ALB) handles incoming web requests and forwards them to EC2 application servers in private subnets. Amazon RDS for MySQL provides the database tier, with Multi-AZ deployment enabled.
+I built this three-tier AWS network to explore how the web, application, and database layers communicate across Availability Zones.
 
-The public subnets contain the ALB and a bastion host. The application instances run in private subnets, while the database is in private DB subnets without an internet default route. Security groups control traffic between the tiers, and a Regional NAT Gateway provides outbound internet access for the application instances.
+The design uses an internet-facing Application Load Balancer (ALB), two EC2 application instances in private subnets, and Amazon RDS for MySQL with Multi-AZ deployment. A bastion host provides administrative access to the application instances, while a Regional NAT Gateway gives them outbound internet access.
 
-The ALB was tested while both application instances were available. One instance was then stopped to check whether requests continued reaching the other. Connectivity from an application instance to RDS and outbound internet access through the NAT Gateway were also tested. Finally, the ALB security group was removed from the application security group to test the effect of a missing ALB-to-app rule.
+I focused on the network layout, security group rules, private connectivity, and the behavior of the application when one EC2 instance was unavailable.
 
 ## Network layout
 
-The VPC uses `10.0.0.0/16` in `us-east-1`. The public, application, and database tiers each have subnets in `us-east-1a` and `us-east-1b`.
+The VPC uses `10.0.0.0/16` in `us-east-1`. I divided it into public, application, and database subnets across `us-east-1a` and `us-east-1b`.
 
 | Tier | Subnet | Availability Zone | CIDR |
 |---|---|---|---|
@@ -23,27 +23,27 @@ The VPC uses `10.0.0.0/16` in `us-east-1`. The public, application, and database
 | Database | Private DB Subnet A | `us-east-1a` | `10.0.21.0/24` |
 | Database | Private DB Subnet B | `us-east-1b` | `10.0.22.0/24` |
 
-Separate route tables handle traffic for the public, application, and database subnets:
+Each tier has its own route table:
 
 | Route table | Default route | Purpose |
 |---|---|---|
-| Public | `0.0.0.0/0` → Internet Gateway | Internet connectivity for public resources |
+| Public | `0.0.0.0/0` → Internet Gateway | Internet access for public resources |
 | Private App | `0.0.0.0/0` → Regional NAT Gateway | Outbound internet access for application instances |
-| Private DB | No internet default route | Keeps the database tier off the direct internet route |
+| Private DB | No internet default route | Keeps the database tier off the internet route |
 
-The VPC's local route allows communication between its subnets. The database route table has no default route to the Internet Gateway or NAT Gateway.
+The VPC local route allows communication between subnets. I left the database route table without a default route to either the Internet Gateway or NAT Gateway.
 
-**Screenshots:**
+**Network configuration:**
 
 - VPC and subnet layout: [VPC overview](screenshots/1-1-vpc-summary-page.png) · [Subnet list](screenshots/2-1-subnet-list.png)
 - Public subnet configuration: [Public Subnet A](screenshots/2-2-1-public-subnet-a.png) · [Public Subnet B](screenshots/2-2-2-public-subnet-b.png)
 - Application subnet configuration: [Private App Subnet A](screenshots/2-2-3-app-subnet-a.png) · [Private App Subnet B](screenshots/2-2-4-app-subnet-b.png)
 - Database subnet configuration: [Private DB Subnet A](screenshots/2-2-5-db-subnet-a.png) · [Private DB Subnet B](screenshots/2-2-6-db-subnet-b.png)
-- Route table configuration and associations: [Public routes](screenshots/5-1-1-public-route-table-routes.png) · [Public subnet associations](screenshots/5-1-2-public-route-table-subnets.png) · [App routes](screenshots/5-2-1-app-route-table-routes.png) · [App subnet associations](screenshots/5-2-2-app-route-table-subnets.png) · [DB routes](screenshots/5-3-1-db-route-table-routes.png) · [DB subnet associations](screenshots/5-3-2-db-route-table-subnets.png)
+- Route table routes and subnet associations: [Public routes](screenshots/5-1-1-public-route-table-routes.png) · [Public subnet associations](screenshots/5-1-2-public-route-table-subnets.png) · [App routes](screenshots/5-2-1-app-route-table-routes.png) · [App subnet associations](screenshots/5-2-2-app-route-table-subnets.png) · [DB routes](screenshots/5-3-1-db-route-table-routes.png) · [DB subnet associations](screenshots/5-3-2-db-route-table-subnets.png)
 
 ## Network security
 
-The security groups allow the traffic needed between the tiers:
+I used security groups to define the allowed traffic between each tier. The rules follow the application path from the internet to the ALB, from the ALB to the application instances, and from the application instances to RDS.
 
 1. Internet clients connect to the ALB over HTTP/HTTPS.
 2. The ALB forwards HTTP traffic to the application instances.
@@ -57,15 +57,15 @@ The security groups allow the traffic needed between the tiers:
 | `db-sg` | MySQL (3306) from `app-sg` |
 | `bastion-sg` | SSH (22) from `0.0.0.0/0` |
 
-The application and database instances are not open to direct inbound internet traffic. In addition, the `db-sg` allows MySQL connections only from `app-sg`.
+The application and database instances do not accept direct inbound internet traffic. The `db-sg` rule also limits MySQL access to the application tier.
 
-**Screenshots:** [ALB security group](screenshots/6-1-alb-security-group.png) · [Application security group](screenshots/6-2-app-security-group.png) · [Database security group](screenshots/6-3-db-security-group.png) · [Bastion security group](screenshots/6-4-bastion-sg.png)
+**Security group configuration:** [ALB security group](screenshots/6-1-alb-security-group.png) · [Application security group](screenshots/6-2-app-security-group.png) · [Database security group](screenshots/6-3-db-security-group.png) · [Bastion security group](screenshots/6-4-bastion-sg.png)
 
 ## Internet Gateway and NAT Gateway
 
-An Internet Gateway provides internet connectivity for resources in the public subnets. A Regional NAT Gateway allows the private application instances to make outbound internet connections.
+The Internet Gateway provides internet connectivity for resources in the public subnets. I configured a Regional NAT Gateway for outbound connections from the private application subnets.
 
-The application instances can reach the internet through the NAT Gateway without having public IP addresses or accepting direct inbound connections from the internet.
+This gives the application instances access to package repositories and other external services without public IP addresses or direct inbound internet access.
 
 ![Internet Gateway](screenshots/3-1-internet-gateway.png)
 
@@ -78,9 +78,11 @@ The NAT Gateway uses Elastic IP addresses:
 
 ## Application servers
 
-Two EC2 application instances run in the private application subnets, one in each Availability Zone. Both use Amazon Linux and Apache HTTP Server (`httpd`). Each server displays its name on a simple web page. This identifies the instance that responded to a request through the ALB.
+I deployed two EC2 application instances in the private application subnets, one in each Availability Zone. Both use Amazon Linux and Apache HTTP Server (`httpd`).
 
-EC2 user data sets up both instances. It installs Apache, starts and enables the service, and writes the server name to the default web page.
+Each instance serves a simple page with its own name. This made it possible to identify which instance handled a request through the ALB and verify that both targets received traffic.
+
+EC2 user data installs Apache, starts and enables the service, and writes the instance name to the default web page.
 
 ### App Server A user data
 
@@ -112,27 +114,27 @@ systemctl enable httpd
 echo "App Server B" > /var/www/html/index.html
 ```
 
-Both scripts use the same setup. The final `echo` command differs so the page identifies which instance handled the request.
+The scripts use the same setup. Only the final `echo` command differs, so each page identifies its EC2 instance.
 
-**Screenshots:** [EC2 instance list](screenshots/7-1-instance-list-view.png) · [App Server A](screenshots/7-2-app-instance-a-detail.png) · [App Server B](screenshots/7-3-app-instance-b-detail.png)
+**EC2 configuration:** [EC2 instance list](screenshots/7-1-instance-list-view.png) · [App Server A](screenshots/7-2-app-instance-a-detail.png) · [App Server B](screenshots/7-3-app-instance-b-detail.png)
 
 ## Application Load Balancer
 
-The internet-facing ALB runs in the public subnets, and its target group contains both EC2 application instances in the private subnets. Health checks determine which instances can receive traffic.
+The internet-facing ALB runs in the public subnets. Its target group contains both EC2 application instances in the private subnets, and health checks determine which targets can receive requests.
 
-The ALB forwards HTTP requests to the application instances. The `app-sg` security group allows HTTP traffic from the `alb-sg` security group, rather than accepting HTTP directly from the internet.
+The ALB forwards HTTP requests to the application instances. The `app-sg` security group allows HTTP only from the `alb-sg` security group, rather than from the internet.
 
-**Screenshots:** [ALB overview](screenshots/8-1-alb-overview.png) · [ALB resource map](screenshots/8-2-alb-resource-map.png) · [ALB security group](screenshots/8-3-alb-security-group.png) · [Target group](screenshots/8-4-alb-target-group.png) · [Target health checks](screenshots/8-5-target-group-health-check.png)
+**ALB configuration:** [ALB overview](screenshots/8-1-alb-overview.png) · [ALB resource map](screenshots/8-2-alb-resource-map.png) · [ALB security group](screenshots/8-3-alb-security-group.png) · [Target group](screenshots/8-4-alb-target-group.png) · [Target health checks](screenshots/8-5-target-group-health-check.png)
 
 ## Bastion host
 
-The bastion host sits in a public subnet and provides SSH access to the private application instances. The `app-sg` security group allows SSH only from the `bastion-sg` security group, so the application instances do not accept SSH directly from the internet.
+I placed the bastion host in a public subnet so it could provide SSH access to the private application instances. The `app-sg` security group allows SSH only from `bastion-sg`, so the application instances do not accept SSH directly from the internet. The bastion security group allowed SSH from 0.0.0.0/0 during this project. In a production environment, I would restrict that rule to a trusted source IP range.
 
 ![Bastion host details](screenshots/7-4-bastion-detail.png)
 
 ## Amazon RDS for MySQL
 
-Amazon RDS for MySQL runs in the private DB subnet group with Multi-AZ enabled. The primary instance is in `us-east-1a`, with a standby in `us-east-1b`.
+Amazon RDS for MySQL runs in the private DB subnet group with Multi-AZ enabled. The primary instance is in `us-east-1a`, and the standby is in `us-east-1b`.
 
 The database subnets have no internet default route. The `db-sg` security group allows MySQL traffic on TCP port `3306` only from the `app-sg` security group.
 
@@ -140,17 +142,17 @@ The database subnets have no internet default route. The `db-sg` security group 
 
 ## Validation
 
-The following tests checked the network configuration and application behavior.
+I tested the main network paths and application behavior after the configuration was in place. The tests covered load balancing, the loss of one application instance, database connectivity, and outbound access through the NAT Gateway.
 
 ### Load balancing
 
-Requests to the ALB's DNS name returned either App Server A or App Server B. This confirmed that traffic reached both instances.
+Requests to the ALB DNS name returned either App Server A or App Server B. This verified that both instances received traffic through the target group.
 
 ![Requests through the ALB](screenshots/9-1-browser-test.png)
 
 ### Application instance failure
 
-App Server A was stopped to check whether the ALB would keep serving requests. After the health check marked it unhealthy, the ALB sent requests to App Server B.
+I stopped App Server A to test whether the ALB would continue to serve requests. After the health check marked it unhealthy, the ALB sent requests to App Server B.
 
 ![App Server A stopped](screenshots/9-2-1-stopped-instance-a.png)
 
@@ -158,25 +160,25 @@ App Server A was stopped to check whether the ALB would keep serving requests. A
 
 ![Requests served by App Server B](screenshots/9-2-3-failover-to-instance-b.png)
 
-The application remained reachable when one EC2 instance was unavailable. An entire Availability Zone failure was not tested.
+The application remained reachable while one EC2 instance was unavailable.
 
 ### Application-to-database connectivity
 
-A connection from the application instance to the RDS MySQL endpoint was established over TCP port `3306`. The connection used the VPC's private networking. The `db-sg` security group allowed traffic from the `app-sg` security group.
+I established a connection from the application instance to the RDS MySQL endpoint over TCP port `3306`. The connection used the VPC's private networking, and the `db-sg` security group allowed traffic from `app-sg`.
 
-![Application instance connecting to RDS](screenshots/7-6-connecting-to-db.png)
+![Application-to-RDS connection](screenshots/7-6-connecting-to-db.png)
 
 ### Outbound access through NAT
 
-A private application instance successfully accessed the internet through the Regional NAT Gateway. This confirmed that the private app route table used the NAT Gateway for its default route.
+A private application instance successfully accessed the internet through the Regional NAT Gateway. This verified that the private app route table sent its default route to the NAT Gateway.
 
 ![Outbound internet access through NAT](screenshots/9-3-app-instance-bastion-host-nat.png)
 
 ## Security group failure test
 
-To test a missing ALB-to-app rule, the `alb-sg` security group was removed from the inbound rules of the `app-sg` security group. The ALB could no longer reach the application instances, and requests returned a `504 Gateway Timeout`.
+I removed `alb-sg` from the inbound rules of `app-sg` to test the effect of a missing ALB-to-app rule. The ALB could no longer reach the application instances, and requests returned a `504 Gateway Timeout`.
 
-The result confirmed that the `app-sg` security group must allow inbound HTTP from the `alb-sg` security group for the ALB to reach the application instances.
+The test demonstrated the role of the ALB-to-app security group rule. Without inbound HTTP access from alb-sg, the ALB could not reach the application targets.
 
 ![Removing the ALB security group rule](screenshots/10-1-1-remove-alb-sg.png)
 
@@ -186,7 +188,7 @@ The result confirmed that the `app-sg` security group must allow inbound HTTP fr
 
 ## Project files
 
-The project includes the architecture diagram, EC2 user-data scripts, and screenshots of the AWS configuration and tests.
+The project includes the architecture diagram, EC2 user-data scripts, and screenshots from the AWS configuration and validation.
 
 - **[architecture/](./architecture/)** — PNG architecture diagram and editable draw.io source.
 - **[configs/](./configs/)** — EC2 user-data scripts for App Server A and App Server B.

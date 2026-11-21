@@ -4,19 +4,20 @@
 
 ## Overview
 
-This project covers setting up an AWS Site-to-Site VPN between an AWS VPC and an on-premises network simulated in GNS3. A Cisco IOSv router acts as the Customer Gateway, while an AWS Virtual Private Gateway handles the other end of the connection.
+This project connects an AWS VPC to a simulated on-premises network in GNS3 through an AWS Site-to-Site VPN. A Cisco IOSv router connects the on-premises network to the VPN. An AWS Virtual Private Gateway connects the VPN to the VPC.
 
-AWS provides two IPsec tunnels for the VPN connection. Both are configured on the Cisco router, with Tunnel 1 used as the primary path and Tunnel 2 as the backup. IP SLA and object tracking monitor tunnel reachability and determine which static route stays active.
+The VPN has two IPsec tunnels. Tunnel 1 carries traffic under normal conditions, and Tunnel 2 acts as a backup. IP SLA checks whether each tunnel can reach AWS. Object tracking uses those results to control which static route the router uses.
 
-Since the Cisco router sits behind a home router, the configuration also needs to account for NAT. This involves excluding AWS-bound traffic from PAT and using NAT Traversal (NAT-T) to allow the VPN connection to work through the upstream router. Connectivity was tested in both directions, followed by a failover test with the primary tunnel taken offline.
+The Cisco router uses a private WAN address behind the home router. The home router's public IP address is configured as the AWS Customer Gateway address. A NAT access list prevents traffic to the AWS VPC from being translated. I tested ping and SSH in both directions across the VPN. I also shut down Tunnel 1 to confirm that traffic switched to Tunnel 2.
 
 ## Network layout
 
-The on-premises LAN uses `192.168.0.0/24`, while the AWS VPC uses `10.0.0.0/16`.
+The on-premises LAN uses `192.168.0.0/24`. The AWS VPC uses `10.0.0.0/16`.
 
 | Component | Interface / location | Address |
 |---|---|---|
 | On-premises LAN | GNS3 host network | `192.168.0.0/24` |
+| `on-prem-pc` | On-premises LAN | `192.168.0.10` |
 | Cisco IOSv router | LAN - `GigabitEthernet0/1` | `192.168.0.1/24` |
 | Cisco IOSv router | WAN - `GigabitEthernet0/0` | `192.168.1.100/24` |
 | Home router | WAN next hop | `192.168.1.1` |
@@ -25,13 +26,13 @@ The on-premises LAN uses `192.168.0.0/24`, while the AWS VPC uses `10.0.0.0/16`.
 | AWS subnet | Public subnet in `us-east-1a` | `10.0.1.0/24` |
 | EC2 test instance | Private IP | `10.0.1.61` |
 
-The Cisco router's WAN interface uses the private address `192.168.1.100`. The home router performs NAT for internet access. AWS sees the home router's public IP, `96.230.78.21`, which is the address configured on the Customer Gateway.
+The Cisco router's WAN interface has the private IP address `192.168.1.100`. It connects to the home router at `192.168.1.1`. The home router provides internet access and uses its public IP address, `96.230.78.21`, for the AWS Customer Gateway configuration.
 
 ## AWS network
 
-The AWS environment uses a VPC with the address space `10.0.0.0/16` and a `10.0.1.0/24` subnet in `us-east-1a`. An EC2 instance in the subnet provides a test endpoint for verifying connectivity across the VPN.
+The VPC contains a public subnet in `us-east-1a` and an EC2 instance used to test the VPN connection. DNS resolution and DNS hostnames are enabled for the VPC.
 
-DNS resolution and DNS hostnames are enabled on the VPC. The route table directs traffic destined for `192.168.0.0/24` through the Virtual Private Gateway, while the local route handles communication within the VPC's `10.0.0.0/16` address space.
+The VPC route table sends traffic for `192.168.0.0/24` through the Virtual Private Gateway. The local route handles traffic between resources inside the VPC.
 
 ### VPC overview
 
@@ -51,9 +52,9 @@ DNS resolution and DNS hostnames are enabled on the VPC. The route table directs
 
 ### Site-to-Site VPN
 
-The Customer Gateway represents the on-premises VPN endpoint and uses the home router's public IP address. On the AWS side, the Virtual Private Gateway is attached to the VPC and terminates the VPN connection.
+The Customer Gateway uses the home router's public IP address to identify the on-premises VPN device. The Virtual Private Gateway is attached to the VPC and connects it to the VPN.
 
-The VPN uses static routing to reach the on-premises network, `192.168.0.0/24`. AWS provides two IPsec tunnels, each with its own public peer address and inside `/30` address range.
+The VPN uses static routing for the on-premises network `192.168.0.0/24`. AWS provides two IPsec tunnels. Each tunnel has its own AWS public IP address and a pair of inside tunnel addresses from a `/30` network.
 
 ### VPN connection overview
 
@@ -61,20 +62,20 @@ The VPN uses static routing to reach the on-premises network, `192.168.0.0/24`. 
 
 | Setting | Tunnel 1 | Tunnel 2 |
 |---|---|---|
-| Role | Preferred path | Backup path |
+| Role | Primary | Backup |
 | AWS public peer | `34.193.85.87` | `100.50.211.87` |
 | On-premises public endpoint | `96.230.78.21` | `96.230.78.21` |
 | Cisco tunnel interface | `Tunnel1` | `Tunnel2` |
 | AWS inside address | `169.254.222.169/30` | `169.254.81.233/30` |
 | On-premises inside address | `169.254.222.170/30` | `169.254.81.234/30` |
 
-The AWS console shows the status of each tunnel, along with the Customer Gateway and Virtual Private Gateway configuration.
+The AWS VPN connection uses the Customer Gateway and Virtual Private Gateway. It includes configuration details for both tunnels.
 
-### Tunnel 1 status
+### Tunnel 1 endpoint
 
 ![AWS Tunnel 1 status](screenshots/3-2-tunnel-1-status.png)
 
-### Tunnel 2 status
+### Tunnel 2 endpoint
 
 ![AWS Tunnel 2 status](screenshots/3-3-tunnel-2-status.png)
 
@@ -88,7 +89,7 @@ The AWS console shows the status of each tunnel, along with the Customer Gateway
 
 ### EC2 test instance
 
-The EC2 instance runs in the public subnet and has the private IP address `10.0.1.61`. Its security group allows ICMP and SSH, which makes it possible to test connectivity and establish SSH sessions between AWS and the on-premises network.
+The EC2 instance runs in the public subnet and has the private IP address `10.0.1.61`. Its security group allows ping and SSH traffic between the instance and `on-prem-pc`.
 
 ### EC2 instance details
 
@@ -100,7 +101,7 @@ The EC2 instance runs in the public subnet and has the private IP address `10.0.
 
 ## On-premises environment
 
-GNS3 simulates the on-premises network. A Cisco IOSv router connects the LAN to the home router. `GigabitEthernet0/1` connects to the `192.168.0.0/24` LAN, while `GigabitEthernet0/0` connects to the `192.168.1.0/24` network.
+The on-premises network is simulated in GNS3. The Cisco IOSv router connects the LAN to the home router. `GigabitEthernet0/1` connects to the LAN at `192.168.0.0/24`. `GigabitEthernet0/0` connects to the home router's network at `192.168.1.0/24`. The home router provides internet access and NAT. `Tunnel1` and `Tunnel2` connect to the two AWS VPN tunnel endpoints.
 
 ### GNS3 topology
 
@@ -113,7 +114,7 @@ The router interfaces are configured as follows:
 | `GigabitEthernet0/0` | WAN | `192.168.1.100/24` | `ip nat outside` |
 | `GigabitEthernet0/1` | LAN | `192.168.0.1/24` | `ip nat inside` |
 
-Internet-bound traffic leaves through the home router at `192.168.1.1`, while traffic destined for the AWS VPC is routed through the IPsec tunnel interfaces.
+The default route sends traffic to the home router at `192.168.1.1`. Routes to the AWS VPC use the IPsec tunnels.
 
 ## Routing and NAT
 
@@ -125,9 +126,9 @@ ip route 10.0.0.0 255.255.0.0 Tunnel1 track 100
 ip route 10.0.0.0 255.255.0.0 Tunnel2 2 track 200
 ```
 
-Tunnel 1 is the preferred route, with an administrative distance of 1. Tunnel 2 has a higher administrative distance of 2, so it becomes the preferred path when the primary route is withdrawn. IP SLA and object tracking control when each route is installed.
+Tunnel 1 has an administrative distance of 1, so the router prefers it when it is available. IP SLA 100 and tracking object 100 check the primary tunnel. Tunnel 2 has an administrative distance of 2, so it acts as the backup route. If the primary route is removed, the router uses Tunnel 2.
 
-PAT is also configured for general internet access. Traffic between the on-premises LAN and AWS needs to retain its original source address. The NAT access list excludes that traffic from translation and permits other LAN traffic to use PAT:
+PAT allows devices on the on-premises LAN to share the router's WAN address for internet access. Traffic to the AWS VPC keeps its original source IP address. This allows AWS to send replies back to `on-prem-pc`. The NAT access list excludes traffic to the AWS VPC from PAT and allows other LAN traffic to use PAT:
 
 ```text
 ip access-list extended NONAT
@@ -137,25 +138,21 @@ ip access-list extended NONAT
 ip nat inside source list NONAT interface GigabitEthernet0/0 overload
 ```
 
-The `deny` statement does not drop the VPN traffic. It prevents packets destined for the AWS VPC from matching the NAT rule. Other matching LAN traffic can still be translated through the WAN interface.
+The `deny` statement does not block traffic. It prevents packets to the AWS VPC from matching the NAT rule. The `permit` statement allows other LAN traffic to use PAT through the WAN interface.
 
 ## VPN tunnel configuration
 
-The Cisco router has a separate tunnel interface for each AWS IPsec tunnel. Both use `GigabitEthernet0/0` as their source interface, but each connects to a different AWS public peer address.
+The Cisco router has one tunnel interface for each AWS IPsec tunnel. Both use `GigabitEthernet0/0` as the source interface. `Tunnel1` connects to the first AWS tunnel address, and `Tunnel2` connects to the second.
 
-Since the Cisco router is behind the home router's NAT, NAT Traversal (NAT-T) is required. During IKE negotiation, the peers detect the NAT device and encapsulate ESP traffic in UDP, typically over port 4500. This allows the IPsec traffic to pass through the home router.
-
-The router also has an ISAKMP NAT keepalive configured:
+The router configuration includes NAT-T and an ISAKMP NAT keepalive with a 10-second interval:
 
 ```text
 crypto isakmp nat keepalive 10
 ```
 
-This configures the NAT keepalive interval to 10 seconds. When NAT-T is in use, the keepalive helps prevent the home router from expiring its UDP mapping during periods of inactivity. NAT-T handles ESP encapsulation, while the keepalive helps maintain the NAT mapping. The command does not enable NAT-T or keep the IKE/IPsec security associations alive by itself.
+ ## Tunnel monitoring and failover
 
-## Tunnel monitoring and failover
-
-IP SLA and object tracking monitor both tunnels. Each IP SLA operation periodically sends ICMP probes to the AWS inside address of its corresponding tunnel:
+IP SLA checks whether each tunnel can reach its AWS inside address. Each check sends an ICMP probe every five seconds. Object tracking uses the probe results to determine whether the route through that tunnel should remain active:
 
 ```text
 ip sla 100
@@ -171,33 +168,33 @@ ip sla schedule 200 life forever start-time now
 track 200 ip sla 200 reachability
 ```
 
-If an IP SLA probe fails, its tracking object changes state and the associated static route is withdrawn. Tunnel 1 is normally preferred because it has the lower administrative distance. If it becomes unavailable, the router can use the floating static route through Tunnel 2 instead.
+If an IP SLA check fails, its tracking object goes Down and the router removes the route through that tunnel. Tunnel 1 is the primary route because it has the lower administrative distance. If Tunnel 1 fails, the router uses Tunnel 2.
 
 ## Validation
 
-The router interfaces, routing table, IKE and IPsec security associations, and IP SLA tracking state were checked before connectivity testing. These checks verified that both tunnels were established.
+I checked the router interfaces, routing table, IKE and IPsec security associations, and IP SLA tracking before testing connectivity. Both IPsec tunnels were up.
 
 ### Router verification
 
-The interface status verifies the WAN and LAN addressing, along with the state of both tunnel interfaces.
+The interface output shows the WAN and LAN IP addresses and confirms that both tunnel interfaces are up.
 
-#### Router interface status
+#### WAN, LAN, and tunnel interfaces verified
 
 ![Router interface status](screenshots/6-1-show-ip-interface-brief.png)
 
-The routing table confirms that both routes to the AWS VPC are configured. Tunnel 1 is preferred with an administrative distance of 1, while Tunnel 2 has an administrative distance of 2.
+The routing table has routes to the AWS VPC through both tunnels. Tunnel 1 is the primary route with an administrative distance of 1. Tunnel 2 is the backup route with an administrative distance of 2.
 
-#### Router routing table
+#### Primary and backup routes installed
 
 ![Router routing table](screenshots/6-2-show-ip-route.png)
 
-Both AWS peers appear in the `QM_IDLE` state. This indicates that IKE negotiation and Quick Mode have completed successfully.
+Both AWS peers show `QM_IDLE`, which confirms that the IKE connections are established.
 
-#### IKE security associations
+#### Both IKE peers established
 
 ![IKE security associations](screenshots/6-3-show-crypto-isakmp-sa.png)
 
-The IPsec security associations show that both tunnels have established their SAs.
+The IPsec output shows security associations for both tunnels.
 
 <table>
   <tr>
@@ -210,64 +207,64 @@ The IPsec security associations show that both tunnels have established their SA
   </tr>
 </table>
 
-The tracking output shows the reachability state reported by both IP SLA operations, which determines whether their associated static routes remain active.
+The tracking output shows whether each IP SLA check is Up or Down. The router uses these states to decide whether to keep each route.
 
-#### IP SLA and object tracking
+#### Tunnel reachability tracking verified
 
 ![IP SLA and object tracking](screenshots/6-6-show-track.png)
 
 ## End-to-end connectivity
 
-The on-premises host (`192.168.0.10`) and EC2 instance (`10.0.1.61`) were used to test connectivity across the VPN in both directions using ICMP and SSH.
+I tested ping and SSH between `on-prem-pc` (`192.168.0.10`) and the EC2 instance (`10.0.1.61`) in both directions.
 
-The on-premises test host uses an address in the `192.168.0.0/24` subnet:
+`on-prem-pc` uses an address in the `192.168.0.0/24` subnet:
 
-### On-premises host IP configuration
+### `on-prem-pc` IP configuration
 
-![On-premises host IP configuration](screenshots/7-1-on-prem-pc-ip.png)
+![`on-prem-pc` IP configuration](screenshots/7-1-on-prem-pc-ip.png)
 
-Both hosts were able to ping each other across the VPN. SSH sessions were also established in both directions. These tests verified connectivity over TCP port 22.
+Ping worked in both directions across the VPN. SSH connections also succeeded from `on-prem-pc` to the EC2 instance and from the EC2 instance back to `on-prem-pc`.
 
 <table>
   <tr>
-    <td align="center"><strong>On-premises to AWS - Ping</strong></td>
-    <td align="center"><strong>AWS to on-premises - Ping</strong></td>
+    <td align="center"><strong>on-prem-pc to AWS - Ping</strong></td>
+    <td align="center"><strong>AWS to on-prem-pc - Ping</strong></td>
   </tr>
   <tr>
-    <td><img src="screenshots/7-2-ping-from-onprem-to-ec2.png" alt="Ping from on-premises host to EC2" width="100%"></td>
-    <td><img src="screenshots/7-4-ping-from-ec2-to-onprem.png" alt="Ping from EC2 to on-premises host" width="100%"></td>
+    <td><img src="screenshots/7-2-ping-from-onprem-to-ec2.png" alt="Ping from on-prem-pc to EC2" width="100%"></td>
+    <td><img src="screenshots/7-4-ping-from-ec2-to-onprem.png" alt="Ping from EC2 to on-prem-pc" width="100%"></td>
   </tr>
   <tr>
-    <td align="center"><strong>On-premises to AWS - SSH</strong></td>
-    <td align="center"><strong>AWS to on-premises - SSH</strong></td>
+    <td align="center"><strong>on-prem-pc to AWS - SSH</strong></td>
+    <td align="center"><strong>AWS to on-prem-pc - SSH</strong></td>
   </tr>
   <tr>
-    <td><img src="screenshots/7-3-ssh-from-onprem-to-ec2.png" alt="SSH from on-premises host to EC2" width="100%"></td>
-    <td><img src="screenshots/7-5-ssh-from-ec2-to-onprem.png" alt="SSH from EC2 to on-premises host" width="100%"></td>
+    <td><img src="screenshots/7-3-ssh-from-onprem-to-ec2.png" alt="SSH from on-prem-pc to EC2" width="100%"></td>
+    <td><img src="screenshots/7-5-ssh-from-ec2-to-onprem.png" alt="SSH from EC2 to on-prem-pc" width="100%"></td>
   </tr>
 </table>
 
 ## Failover test
 
-To test the backup path, Tunnel 1 was shut down on the Cisco router. IP SLA 100 detected that the primary tunnel was unreachable. Tracking object 100 changed state, and the router withdrew the associated static route.
+I shut down Tunnel 1 on the Cisco router to test failover. IP SLA 100 detected that the tunnel was down. Tracking object 100 changed to Down, and the router removed the primary route.
 
-Tunnel 1 went down, and tracking object 100 changed from Up to Down. Tracking object 200 remained Up. This confirmed that the backup tunnel was still reachable:
+Tunnel 1 went Down, and tracking object 100 changed from Up to Down. Tracking object 200 stayed Up, so Tunnel 2 remained available:
 
 ### Tunnel 1 down and tracking state
 
 ![Tunnel 1 down and tracking state](screenshots/8-1-tunnel1-down.png)
 
-The routing table then installs the route to `10.0.0.0/16` through Tunnel 2:
+The routing table switched the route to `10.0.0.0/16` to Tunnel 2:
 
-### AWS VPC route through Tunnel 2
+### Backup route installed through Tunnel 2
 
 ![AWS VPC route through Tunnel 2](screenshots/8-2-traffic-shift-to-tunnel2.png)
 
-With Tunnel 1 unavailable, the router uses Tunnel 2 to reach the AWS VPC. The default route through `192.168.1.1` remains unchanged.
+The router continued to reach the AWS VPC through Tunnel 2. The default route through `192.168.1.1` did not change.
 
 ## Project files
 
-The repository includes the architecture diagram, Cisco router configurations, AWS VPN configuration, and screenshots from the deployment and testing.
+The project includes the architecture diagram, Cisco router configurations, AWS VPN configuration, and screenshots of the setup and tests.
 
 - **[architecture/](./architecture/)** - PNG architecture diagram and editable draw.io source.
 - **[configs/](./configs/)** - Cisco router configurations and the AWS-generated VPN configuration.

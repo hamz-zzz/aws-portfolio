@@ -4,15 +4,15 @@
 
 ## Overview
 
-This project uses an Application Load Balancer (ALB) and an Auto Scaling Group to host a web application in AWS. The ALB receives web requests in the public subnets and forwards them to EC2 instances in private application subnets across two Availability Zones.
+I built this web app infrastructure project to demonstrate how an internet-facing application can run across multiple Availability Zones in AWS. The design uses an Application Load Balancer (ALB), private EC2 application instances, and an Auto Scaling Group.
 
-The Auto Scaling Group starts with two instances and can scale out to three when average CPU utilization reaches its target. It also replaces an instance if it is terminated. A Regional NAT Gateway provides outbound internet access for the private instances.
+The ALB receives HTTP requests in the public subnets and forwards them to the application instances in the private subnets. The Auto Scaling Group maintains two instances at its desired capacity and can launch a third when average CPU utilization reaches its target. It also replaces an instance if it is terminated.
 
-Testing covered three things: whether the ALB sent requests to both instances, whether CPU load triggered scale-out, and whether the Auto Scaling Group replaced a terminated instance.
+I focused on three behaviors: whether requests reached both application instances, whether CPU load triggered scale-out, and whether the group replaced a terminated instance.
 
 ## Network layout
 
-The VPC uses the `10.0.0.0/16` address range in `us-east-1`, with public and private application subnets in `us-east-1a` and `us-east-1b`.
+The VPC uses `10.0.0.0/16` in `us-east-1`. I divided it into public and private application subnets across `us-east-1a` and `us-east-1b`.
 
 | Tier | Subnet | Availability Zone | CIDR |
 |---|---|---|---|
@@ -21,22 +21,38 @@ The VPC uses the `10.0.0.0/16` address range in `us-east-1`, with public and pri
 | Application | Private App Subnet A | `us-east-1a` | `10.0.11.0/24` |
 | Application | Private App Subnet B | `us-east-1b` | `10.0.12.0/24` |
 
-An Internet Gateway provides internet connectivity for the public subnets. A Regional NAT Gateway gives the private instances outbound internet access.
+The Internet Gateway provides internet connectivity for the public subnets. A Regional NAT Gateway gives the private application instances outbound internet access.
 
-**Screenshots:** [VPC overview](screenshots/1-1-vpc-summary-page.png) · [Subnet list](screenshots/2-1-subnet-list.png) · [Public Subnet A](screenshots/2-2-1-public-subnet-a.png) · [Public Subnet B](screenshots/2-2-2-public-subnet-b.png) · [Private App Subnet A](screenshots/2-2-3-app-subnet-a.png) · [Private App Subnet B](screenshots/2-2-4-app-subnet-b.png)
+**VPC overview**
+
+![VPC summary](screenshots/1-1-vpc-summary-page.png)
+
+**Subnet layout**
+
+![Subnet list across both Availability Zones](screenshots/2-1-subnet-list.png)
+
+**Subnet details:** [Public Subnet A](screenshots/2-2-1-public-subnet-a.png) · [Public Subnet B](screenshots/2-2-2-public-subnet-b.png) · [Private App Subnet A](screenshots/2-2-3-app-subnet-a.png) · [Private App Subnet B](screenshots/2-2-4-app-subnet-b.png)
 
 ## Routing and internet access
 
-The public route table sends the default route (`0.0.0.0/0`) to the Internet Gateway. The private application route table sends its default route to the Regional NAT Gateway. This lets EC2 instances download packages and updates without public IP addresses.
+Separate route tables handle the public and private application subnets.
 
-- [Public route table routes](screenshots/5-1-1-public-route-table-routes.png)
-- [Public route table associations](screenshots/5-1-2-public-route-table-subnets.png)
-- [Private app route table routes](screenshots/5-2-1-app-route-table-routes.png)
-- [Private app route table associations](screenshots/5-2-2-app-route-table-subnets.png)
-- [Internet Gateway](screenshots/3-1-internet-gateway.png)
-- [Regional NAT Gateway](screenshots/4-1-nat-gateway.png)
+| Route table | Default route | Purpose |
+|---|---|---|
+| Public | `0.0.0.0/0` → Internet Gateway | Internet access for public resources |
+| Private application | `0.0.0.0/0` → Regional NAT Gateway | Outbound internet access for private EC2 instances |
+
+The private instances can download packages and updates without public IP addresses. They do not need a direct inbound route from the internet.
+
+**Private application route table**
+
+![Private application route table routes through the NAT Gateway](screenshots/5-2-1-app-route-table-routes.png)
+
+**Additional routing configuration:** [Public route table routes](screenshots/5-1-1-public-route-table-routes.png) · [Public route table associations](screenshots/5-1-2-public-route-table-subnets.png) · [Private app route table associations](screenshots/5-2-2-app-route-table-subnets.png) · [Internet Gateway](screenshots/3-1-internet-gateway.png) · [Regional NAT Gateway](screenshots/4-1-nat-gateway.png)
 
 ## Network security
+
+Security groups control traffic between the ALB, application instances, and bastion host.
 
 | Security group | Inbound access |
 |---|---|
@@ -44,23 +60,47 @@ The public route table sends the default route (`0.0.0.0/0`) to the Internet Gat
 | `app-sg` | HTTP (80) from `alb-sg`, SSH (22) from `bastion-sg` |
 | `bastion-sg` | SSH (22) from `0.0.0.0/0` |
 
-The application instances only allow HTTP traffic from `alb-sg`. SSH from `bastion-sg` allows access to the private instances through the bastion.
+The application instances accept HTTP traffic only from `alb-sg`. SSH access to the private instances is allowed from the bastion security group.
 
-The bastion's SSH rule is open to the internet in this lab configuration.
+The bastion's SSH rule is open to the internet in this lab configuration. In a production environment, I would restrict it to a trusted source IP range.
 
-**Screenshots:** [ALB security group](screenshots/6-1-alb-security-group.png) · [Application security group](screenshots/6-2-app-security-group.png) · [Bastion security group](screenshots/6-4-bastion-sg.png)
+**Security group configuration:** [ALB security group](screenshots/6-1-alb-security-group.png) · [Application security group](screenshots/6-2-app-security-group.png) · [Bastion security group](screenshots/6-4-bastion-sg.png)
 
 ## Application Load Balancer
 
-The internet-facing ALB sits in the public subnets and uses the `WebApp-TG` target group for the EC2 instances in the private application subnets. HTTP health checks determine which instances are healthy and can receive traffic.
+The internet-facing ALB runs in the public subnets. Its `WebApp-TG` target group contains the EC2 instances in the private application subnets. HTTP health checks determine which targets are healthy and can receive requests.
 
-The ALB is named `WebApp-TG`, but I intended to name it `WebApp-ALB`. The target group is also named `WebApp-TG`. The ALB has an HTTP listener on port `80`. The `alb-sg` security group allows traffic on port `443`, but no HTTPS listener or certificate was configured.
+The ALB is named `WebApp-TG`, but I intended to name it `WebApp-ALB`. The target group is also named `WebApp-TG`. The ALB has an HTTP listener on port `80`. The `alb-sg` security group allows traffic on port `443`, but I did not configure an HTTPS listener or certificate.
 
-**Screenshots:** [ALB overview and DNS](screenshots/7-3-1-alb-overview-dns.png) · [ALB Availability Zones](screenshots/7-3-2-alb-availability-zones.png) · [ALB resource map](screenshots/7-3-2-alb-resource-map.png) · [Target group overview](screenshots/7-2-1-target-group-overview.png) · [Target group health check](screenshots/7-2-2-target-group-health-check.png)
+![ALB resource map with the application target group](screenshots/7-3-2-alb-resource-map.png)
+
+**ALB configuration:** [ALB overview and DNS](screenshots/7-3-1-alb-overview-dns.png) · [ALB Availability Zones](screenshots/7-3-2-alb-availability-zones.png) · [Target group overview](screenshots/7-2-1-target-group-overview.png) · [Target group health check](screenshots/7-2-2-target-group-health-check.png)
 
 ## EC2 launch template and Auto Scaling
 
-The `WebApp` launch template contains the settings for the EC2 instances. The user-data script installs and starts Apache (`httpd`), then uses IMDSv2 to get the instance ID and Availability Zone. The web page displays those values and the hostname, so it's clear which instance handled each request.
+The `WebApp` launch template defines the EC2 instance configuration. Its user-data script installs and starts Apache (`httpd`). It also uses IMDSv2 to retrieve the instance ID and Availability Zone. The web page displays those values and the hostname, so each response identifies the instance that handled the request.
+
+### EC2 user data
+
+I added this script to the `WebApp` launch template. It installs Apache, enables the service at boot, retrieves instance metadata through IMDSv2, and writes the instance details to the default web page.
+
+```bash
+#!/bin/bash
+dnf update -y
+dnf install -y httpd
+systemctl start httpd
+systemctl enable httpd
+
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+EC2_AVAIL_ZONE=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
+
+echo "<h1>Hostname: $(hostname -f)</h1>" > /var/www/html/index.html
+echo "<h1>Instance ID: $INSTANCE_ID</h1>" >> /var/www/html/index.html
+echo "<h1>AZ: $EC2_AVAIL_ZONE</h1>" >> /var/www/html/index.html
+```
 
 The `WebApp-ASG` Auto Scaling Group uses the launch template and spans the private application subnets in both Availability Zones.
 
@@ -75,17 +115,19 @@ The `WebApp-ASG` Auto Scaling Group uses the launch template and spans the priva
 | CPU utilization target | Approximately 50% |
 | Attached target group | `WebApp-TG` |
 
-The target tracking policy scales the group based on CPU utilization. Instance replacement was also tested by terminating an EC2 instance and checking that the group launched another one.
+The target tracking policy adjusts capacity based on average CPU utilization. I also terminated an EC2 instance to verify that the group launched a replacement.
 
-**Configuration files:** [`configs/user-data.sh`](configs/user-data.sh) · [`configs/stress-command.sh`](configs/stress-command.sh)
+![Auto Scaling Group capacity settings](screenshots/7-4-1-asg-overview-capacity.png)
 
-**Screenshots:** [Launch template overview](screenshots/7-1-1-launch-template-overview.png) · [Launch template user data](screenshots/7-1-2-launch-template-user-data.png) · [Auto Scaling capacity](screenshots/7-4-1-asg-overview-capacity.png) · [Target group attachment](screenshots/7-4-2-asg-target-group-attachment.png) · [Target tracking policy](screenshots/7-4-3-asg-target-tracking-policy.png)
+**EC2 and Auto Scaling configuration:** [Launch template overview](screenshots/7-1-1-launch-template-overview.png) · [Launch template user data](screenshots/7-1-2-launch-template-user-data.png) · [Target group attachment](screenshots/7-4-2-asg-target-group-attachment.png) · [Target tracking policy](screenshots/7-4-3-asg-target-tracking-policy.png)
 
 ## Validation
 
+I tested the application through the ALB and checked how the Auto Scaling Group responded to CPU load and instance termination.
+
 ### Load balancing
 
-Requests to the ALB DNS name reached both application instances. Each page displayed the instance ID and Availability Zone. This showed which instance handled the request.
+Requests to the ALB DNS name reached both application instances. Each page displayed the instance ID and Availability Zone, which let me identify the instance that handled each request.
 
 ![Response from application instance A](screenshots/8-2-1-alb-response-instance-a.png)
 
@@ -93,36 +135,31 @@ Requests to the ALB DNS name reached both application instances. Each page displ
 
 ### Auto Scaling scale-out
 
-CPU load was generated on an application instance using the command in [`configs/stress-command.sh`](configs/stress-command.sh):
+I generated CPU load on an application instance with the command in [`configs/stress-command.sh`](configs/stress-command.sh):
 
 ```bash
 stress-ng --cpu 4 --cpu-load 90 --timeout 300s
 ```
 
-When average CPU utilization exceeded the target, the Auto Scaling Group launched a third instance. The new instance registered with the target group and became healthy.
-
-The CPU utilization exceeded the target and triggered scale-out.
+Average CPU utilization exceeded the target, and the Auto Scaling Group launched a third instance. The new instance registered with the target group and became healthy.
 
 ![CPU utilization above target](screenshots/9-1-3-cpu-over-50.png)
 
-The Auto Scaling Group launched a third instance, which registered with the target group and became healthy.
-
 ![Three healthy targets after scale-out](screenshots/9-1-6-target-group-3-of-3-healthy.png)
 
-Supporting screenshots: [Stress command on instance A](screenshots/9-1-1-stress-command-a.png) · [Stress command on instance B](screenshots/9-1-2-stress-command-b.png) · [Scale-out activity](screenshots/9-1-4-asg-activity-launching-instance.png) · [Three EC2 instances](screenshots/9-1-5-ec2-three-instances.png)
+The ALB resource map showed the third instance as a target. I then sent another request through the ALB to confirm that the new instance received traffic.
 
-The ALB resource map was checked, followed by another request to confirm that the new instance was receiving traffic.
+![ALB resource map after scale-out](screenshots/9-1-7-alb-resource-map-third-instance.png)
 
-- [ALB resource map with third instance](screenshots/9-1-7-alb-resource-map-third-instance.png)
-- [Response from third instance](screenshots/9-1-8-alb-response-third-instance.png)
+**Scale-out evidence:** [Stress command on instance A](screenshots/9-1-1-stress-command-a.png) · [Stress command on instance B](screenshots/9-1-2-stress-command-b.png) · [Scale-out activity](screenshots/9-1-4-asg-activity-launching-instance.png) · [Three EC2 instances](screenshots/9-1-5-ec2-three-instances.png) · [Response from third instance](screenshots/9-1-8-alb-response-third-instance.png)
 
 ### Instance replacement
 
-An EC2 instance was manually terminated to test replacement. The Auto Scaling Group detected that it was below its desired capacity and launched another instance.
+I manually terminated an EC2 instance to test the Auto Scaling Group's replacement behavior. The group detected that it was below its desired capacity and launched another instance.
 
 ![Auto Scaling activity launching a replacement](screenshots/10-1-3-asg-activity-replacing-instance.png)
 
-The replacement instance recovered and responded to a request through the application.
+The replacement instance became healthy and responded to a request through the application.
 
 ![Application response after instance replacement](screenshots/10-1-4-asg-recovery-response.png)
 
@@ -130,14 +167,14 @@ Supporting screenshots: [Terminated instance](screenshots/10-1-1-instance-termin
 
 ### Final state
 
-At the end of the test, the Auto Scaling Group was back at its desired capacity, with both instances healthy.
+The final check showed the Auto Scaling Group at its desired capacity, with both instances healthy.
 
 ![Final Auto Scaling Group state](screenshots/11-1-1-final-asg-state.png)
 
 ## Project files
 
-The repo includes the architecture diagram and its editable draw.io file, the EC2 user-data and stress-test scripts, and screenshots of the setup and tests.
+The repository contains the architecture diagram, its editable draw.io source, the EC2 user-data and stress-test scripts, and screenshots of the configuration and validation.
 
-- **[architecture/](./architecture/)**   PNG architecture diagram and editable draw.io source.
-- **[configs/](./configs/)**   EC2 user-data script and CPU stress-test command.
-- **[screenshots/](./screenshots/)**   VPC, subnet, route table, security group, load balancer, Auto Scaling, and validation evidence.
+- **[architecture/](./architecture/)**: PNG architecture diagram and editable draw.io source.
+- **[configs/](./configs/)**: EC2 user-data script and CPU stress-test command.
+- **[screenshots/](./screenshots/)**: VPC, subnet, route table, security group, load balancer, Auto Scaling, and validation evidence.
