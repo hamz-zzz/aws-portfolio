@@ -28,6 +28,6 @@ This project deploys an internet-facing web application across two Availability 
 
 ### [4. Content Delivery and DNS](04-content-delivery-and-dns/README.md)
 
-![Project 04 architecture](04-content-delivery-and-dns/architecture/04-cloudfront-and-route-53.png)
+![Project 04 architecture](04-content-delivery-and-dns/architecture/04-content-delivery-and-dns.png)
 
 This project hosts a static website in a private Amazon S3 bucket and delivers it through Amazon CloudFront. Route 53 provides DNS records for the root domain and the `www` subdomain. CloudFront uses Origin Access Control to access the S3 origin, while the bucket policy restricts access to the distribution. An ACM certificate provides HTTPS for both custom domains. I tested website access, direct S3 access restrictions, DNS resolution, CloudFront cache hits and misses, and cache invalidation.
